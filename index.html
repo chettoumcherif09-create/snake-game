@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>🐍 لعبة الثعبان</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="game-wrapper">
+    <header>
+      <div class="score-box">
+        <span>🍎</span>
+        <strong id="score">0</strong>
+      </div>
+      <div class="score-box">
+        <span>🏆</span>
+        <strong id="best">0</strong>
+      </div>
+    </header>
+
+    <canvas id="gameCanvas"></canvas>
+  </div>
+
+  <div id="overlay">
+    <div class="panel">
+      <h1 id="overlay-title">🐍 الثعبان</h1>
+      <p id="overlay-msg">اسحب إصبعك على الشاشة للتحكم</p>
+      <button id="startBtn">ابدأ اللعب</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
