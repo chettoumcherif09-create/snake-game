@@ -1,6 +1,7 @@
 {
-  "name": "لعبة الثعبان",
-  "short_name": "الثعبان",
+  "name": "Snake Game",
+  "description": "لعبة الثعبان",
+  "short_name": "Snake",
   "start_url": "./index.html",
   "display": "fullscreen",
   "orientation": "portrait",
