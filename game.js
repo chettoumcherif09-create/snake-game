@@ -19,6 +19,58 @@ let growPending = 0;
 best = parseInt(localStorage.getItem('snakeBest') || '0');
 bestEl.textContent = best;
 
+// ===== نظام الأصوات =====
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function playTone(freq, duration, type, volume) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.setValueAtTime(volume || 0.15, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function playEatSound() {
+  playTone(800, 0.1, 'square', 0.1);
+  setTimeout(function() { playTone(1200, 0.15, 'square', 0.08); }, 50);
+}
+
+function playDeathSound() {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.5);
+  gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.5);
+}
+
+function playStartSound() {
+  playTone(500, 0.1, 'sine', 0.15);
+  setTimeout(function() { playTone(700, 0.1, 'sine', 0.15); }, 100);
+  setTimeout(function() { playTone(1000, 0.15, 'sine', 0.15); }, 200);
+}
+
 // ===== حجم =====
 function resizeCanvas() {
   const w = window.innerWidth;
@@ -65,13 +117,11 @@ function placeFood() {
   }
 }
 
-// ===== رسم خلفية عشبية =====
+// ===== رسم خلفية =====
 function drawBackground() {
-  // الأخضر الفاتح
   ctx.fillStyle = '#a8e060';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // مربعات شطرنجية خفيفة
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
       if ((x + y) % 2 === 0) {
@@ -85,13 +135,8 @@ function drawBackground() {
 // ===== رسم =====
 function draw() {
   drawBackground();
-
   if (!snake || !food) return;
-
-  // ---- التفاحة ----
   drawApple(food.x, food.y);
-
-  // ---- الثعبان ----
   drawSnake();
 }
 
@@ -101,13 +146,11 @@ function drawApple(gx, gy) {
   const r = CELL * 0.38;
   const pulse = 1 + Math.sin(Date.now() / 200) * 0.08;
 
-  // ظل
   ctx.fillStyle = 'rgba(0,0,0,0.15)';
   ctx.beginPath();
   ctx.ellipse(cx, cy + r * 1.05, r * 0.9, r * 0.25, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // جسم التفاحة
   const grad = ctx.createRadialGradient(cx - r*0.3, cy - r*0.3, r*0.1, cx, cy, r*1.1);
   grad.addColorStop(0, '#ff5555');
   grad.addColorStop(1, '#cc0000');
@@ -116,7 +159,6 @@ function drawApple(gx, gy) {
   ctx.arc(cx, cy, r * pulse, 0, Math.PI * 2);
   ctx.fill();
 
-  // الساق
   ctx.strokeStyle = '#5a3a1a';
   ctx.lineWidth = Math.max(2, CELL * 0.08);
   ctx.lineCap = 'round';
@@ -125,13 +167,11 @@ function drawApple(gx, gy) {
   ctx.lineTo(cx + r * 0.15, cy - r * 1.35);
   ctx.stroke();
 
-  // ورقة
   ctx.fillStyle = '#4aa82a';
   ctx.beginPath();
   ctx.ellipse(cx + r*0.45, cy - r*1.25, r*0.35, r*0.18, Math.PI/4, 0, Math.PI*2);
   ctx.fill();
 
-  // لمعة
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.beginPath();
   ctx.ellipse(cx - r*0.35, cy - r*0.35, r*0.22, r*0.14, -Math.PI/4, 0, Math.PI*2);
@@ -139,7 +179,10 @@ function drawApple(gx, gy) {
 }
 
 function drawSnake() {
-  // ---- الظل تحت الجسم ----
+  const bodyColor = '#1e88e5';
+  const bodyColorDark = '#0d47a1';
+  const bodyRadius = CELL * 0.48;
+
   ctx.fillStyle = 'rgba(0,0,0,0.15)';
   for (let i = 0; i < snake.length; i++) {
     const s = snake[i];
@@ -148,51 +191,35 @@ function drawSnake() {
     ctx.fill();
   }
 
-  // ---- جسم الثعبان (دائرة وراء دائرة) ----
-  const bodyColor = '#1e88e5';
-  const bodyColorDark = '#0d47a1';
-  const bodyRadius = CELL * 0.48;
-
   for (let i = snake.length - 1; i >= 1; i--) {
     const s = snake[i];
     const cx = s.x * CELL + CELL / 2;
     const cy = s.y * CELL + CELL / 2;
-
-    // تدرج لوني حسب الموقع
-    const t = i / snake.length;
     const grad = ctx.createRadialGradient(cx - bodyRadius*0.3, cy - bodyRadius*0.3, bodyRadius*0.1, cx, cy, bodyRadius*1.1);
     grad.addColorStop(0, i === 1 ? '#42a5f5' : bodyColor);
     grad.addColorStop(1, bodyColorDark);
-
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(cx, cy, bodyRadius, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // ---- الرأس ----
   const head = snake[0];
   const hx = head.x * CELL + CELL / 2;
   const hy = head.y * CELL + CELL / 2;
   const headRadius = CELL * 0.58;
 
-  // جسم الرأس
   const headGrad = ctx.createRadialGradient(hx - headRadius*0.3, hy - headRadius*0.3, headRadius*0.1, hx, hy, headRadius*1.1);
   headGrad.addColorStop(0, '#42a5f5');
   headGrad.addColorStop(1, '#0d47a1');
-
   ctx.fillStyle = headGrad;
   ctx.beginPath();
   ctx.arc(hx, hy, headRadius, 0, Math.PI * 2);
   ctx.fill();
 
-  // ---- العيون ----
-  // تحديد اتجاه النظر
   let lookX = dir.x;
   let lookY = dir.y;
   if (lookX === 0 && lookY === 0) { lookX = 1; }
-
-  // عمودي على الاتجاه لتوزيع العينين
   const perpX = -lookY;
   const perpY = lookX;
 
@@ -206,12 +233,10 @@ function drawSnake() {
   const e2x = hx - perpX * eyeOffset + lookX * eyeForward;
   const e2y = hy - perpY * eyeOffset + lookY * eyeForward;
 
-  // بياض العينين
   ctx.fillStyle = '#ffffff';
   ctx.beginPath(); ctx.arc(e1x, e1y, eyeR, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(e2x, e2y, eyeR, 0, Math.PI * 2); ctx.fill();
 
-  // البؤبؤ
   ctx.fillStyle = '#000000';
   const p1x = e1x + lookX * eyeR * 0.35;
   const p1y = e1y + lookY * eyeR * 0.35;
@@ -220,7 +245,6 @@ function drawSnake() {
   ctx.beginPath(); ctx.arc(p1x, p1y, pupilR, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(p2x, p2y, pupilR, 0, Math.PI * 2); ctx.fill();
 
-  // ---- اللسان ----
   if (lookX !== 0 || lookY !== 0) {
     const tongueLen = headRadius * 0.9;
     const tx = hx + lookX * (headRadius + tongueLen * 0.5);
@@ -233,7 +257,6 @@ function drawSnake() {
     ctx.lineTo(tx, ty);
     ctx.stroke();
 
-    // شوكة اللسان
     const forkLen = tongueLen * 0.35;
     const fx1 = tx + lookX * forkLen * 0.7 - lookY * forkLen * 0.5;
     const fy1 = ty + lookY * forkLen * 0.7 + lookX * forkLen * 0.5;
@@ -256,12 +279,9 @@ function update() {
     y: snake[0].y + dir.y
   };
 
-  // اصطدام بالحواجز
   if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
     return endGame();
   }
-
-  // اصطدام بالجسم
   for (let i = 0; i < snake.length - 1; i++) {
     if (snake[i].x === head.x && snake[i].y === head.y) {
       return endGame();
@@ -270,8 +290,8 @@ function update() {
 
   snake.unshift(head);
 
-  // أكل التفاحة → يزيد الطول
   if (head.x === food.x && head.y === food.y) {
+    playEatSound();
     score += 10;
     scoreEl.textContent = score;
     if (score > best) {
@@ -279,12 +299,11 @@ function update() {
       bestEl.textContent = best;
       localStorage.setItem('snakeBest', best);
     }
-    growPending += 1;     // نضيف نمو
+    growPending += 1;
     placeFood();
     if (speed > 70) speed -= 2;
   }
 
-  // تطبيق النمو (بدون حذف الذيل)
   if (growPending > 0) {
     growPending--;
   } else {
@@ -293,6 +312,7 @@ function update() {
 }
 
 function endGame() {
+  playDeathSound();
   gameOver = true;
   running = false;
   overlayTitle.textContent = '💀 انتهت اللعبة';
@@ -317,7 +337,7 @@ function loop(time) {
   if (!gameOver) requestAnimationFrame(loop);
 }
 
-// ===== التحكم بالسحب =====
+// ===== تحكم =====
 function setDir(nd) {
   if (nd.x === -dir.x && nd.y === -dir.y) return;
   if (nd.x === dir.x && nd.y === dir.y) return;
@@ -341,7 +361,6 @@ canvas.addEventListener('touchend', function(e) {
   }
 }, { passive: true });
 
-// كيبورد (اختياري)
 document.addEventListener('keydown', function(e) {
   if (e.key === 'ArrowUp'    || e.key === 'w') setDir({ x: 0,  y: -1 });
   if (e.key === 'ArrowDown'  || e.key === 's') setDir({ x: 0,  y: 1 });
@@ -349,8 +368,9 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'ArrowRight' || e.key === 'd') setDir({ x: 1,  y: 0 });
 });
 
-// ===== زر البدء =====
 startBtn.addEventListener('click', function() {
+  initAudio();
+  playStartSound();
   overlay.classList.add('hidden');
   resetGame();
   resizeCanvas();
@@ -360,6 +380,5 @@ startBtn.addEventListener('click', function() {
   requestAnimationFrame(loop);
 });
 
-// ===== أولي =====
 resetGame();
 draw();
